@@ -3,18 +3,29 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 
-class Problem {
+class Problem{
 public:
     std::string getQuestion();
     std::string getAnswer();
-    std::string getTopic();
-    int getDifficulty();
+
     Problem(std::string rawProblem);
     static std::vector<Problem> problemList(std::string filename);
+
 private:
     std::string question;
     std::string answer;
+};
+
+class DetailedProblem : public Problem{
+public:
+    std::string getTopic();
+    int getDifficulty();
+
+    DetailedProblem(std::string rawProblem) : Problem(rawProblem){}
+
+private:
     std::string topic;
     int difficulty;
 };

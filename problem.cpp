@@ -21,8 +21,8 @@ std::regex re(FORMAT);
 
 std::string Problem::getQuestion() {return question;}
 std::string Problem::getAnswer() {return answer;}
-std::string Problem::getTopic() {return topic;}
-int Problem::getDifficulty() {return difficulty;}
+std::string DetailedProblem::getTopic() {return topic;}
+int DetailedProblem::getDifficulty() {return difficulty;}
 
 Problem::Problem(std::string rawProblem) {
     std::smatch match;
@@ -30,11 +30,22 @@ Problem::Problem(std::string rawProblem) {
         std::cerr << "Invalid problem: " << rawProblem;
         throw std::runtime_error("Invalid problem");
     }
+
     question = match.str(1);
     answer = match.str(2);
+   
+}
+
+DetailedProblem::DetailedProblem(std::string rawProblem) : Problem(rawProblem){
+     std::smatch match;
+    if (!std::regex_search(rawProblem, match, re) == true) {
+        std::cerr << "Invalid problem: " << rawProblem;
+        throw std::runtime_error("Invalid problem");
+    }
     topic = match.str(3);
     difficulty = std::stoi(match.str(4));
-}
+};
+
 std::vector<Problem> Problem::problemList(std::string filename) {
     // Read problems from file
     std::ifstream file(filename);

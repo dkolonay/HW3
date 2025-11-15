@@ -5,6 +5,9 @@
 #include <random>
 #include <map>
 #include <set>
+
+#include <memory>
+
 #include "problem.h"
 
 // ****************************************************************************
@@ -65,27 +68,72 @@ bool valid(std::vector<Problem> test, std::set<std::string> topics) {
     return true;
 }
 
+//Randomize Strategy Interface
+class RandomizeStrategy {
+    public:
+        virtual std::vector<Problem> randomizeTestProblems(std::vector<Problem> bank) = 0;
+};
+
+//Concrete Randomizing Strategy
+class SillyRandomizer : public RandomizeStrategy {
+    public:
+        std::vector<Problem> randomizeTestProblems(std::vector<Problem> bank) override{
+            // Determine the topics covered on the test
+            std::set<std::string> topics;
+            for (Problem p : bank) {
+                topics.insert(p.getTopic());
+            }
+
+            // Used for random generation
+            std::random_device rd;
+            std::mt19937 gen(rd());
+
+            while (true) {
+                std::shuffle(bank.begin(), bank.end(), gen);
+                std::vector<Problem> testProblems(bank.begin(), bank.begin() + NUM_PROBLEMS);
+                if (valid(testProblems, topics)) {
+                    return testProblems;
+                }
+            }
+        }
+};
+
+//Implements concrete strategy patterns (can add functionality for switching strategies)
+class Context{
+    private:
+        std::unique_ptr<RandomizeStrategy> strategy_;
+
+    public:
+        Context(std::unique_ptr<RandomizeStrategy> &&strategy = {}) : strategy_(std::move(strategy)) {}
+
+        std::vector<Problem> randomize(std::vector<Problem> bank){
+            return strategy_->randomizeTestProblems(bank);
+        }
+};
+
+
+
 // Given a bank of possible test problems, return randomly-chosen 
 // problems that form a valid test, according to the contraints above.
-std::vector<Problem> testProblems(std::vector<Problem> bank) {
-    // Determine the topics covered on the test
-    std::set<std::string> topics;
-    for (Problem p : bank) {
-        topics.insert(p.getTopic());
-    }
+// std::vector<Problem> testProblems(std::vector<Problem> bank) {
+//     // Determine the topics covered on the test
+//     std::set<std::string> topics;
+//     for (Problem p : bank) {
+//         topics.insert(p.getTopic());
+//     }
 
-    // Used for random generation
-    std::random_device rd;
-    std::mt19937 gen(rd());
+//     // Used for random generation
+//     std::random_device rd;
+//     std::mt19937 gen(rd());
 
-    while (true) {
-        std::shuffle(bank.begin(), bank.end(), gen);
-        std::vector<Problem> testProblems(bank.begin(), bank.begin() + NUM_PROBLEMS);
-        if (valid(testProblems, topics)) {
-            return testProblems;
-        }
-    }
-}
+//     while (true) {
+//         std::shuffle(bank.begin(), bank.end(), gen);
+//         std::vector<Problem> testProblems(bank.begin(), bank.begin() + NUM_PROBLEMS);
+//         if (valid(testProblems, topics)) {
+//             return testProblems;
+//         }
+//     }
+// }
 
 int main() {
     // Read in problem list and convert to Problem objects
@@ -98,8 +146,11 @@ int main() {
         return 1;
     }
 
+    Context context(std::make_unique<SillyRandomizer>());
+    std::vector<Problem> test = context.randomize(bank);
+
     // Generate the test problems
-    std::vector<Problem> test = testProblems(bank);
+    // std::vector<Problem> test = testProblems(bank);
 
     // Write the tex header to the file
     outputFile << "\\input{" << TEX_HEADER << "}\n";
