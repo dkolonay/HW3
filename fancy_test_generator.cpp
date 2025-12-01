@@ -5,10 +5,13 @@
 #include <random>
 #include <map>
 #include <set>
+#include <vector>
 
 #include <memory>
 
 #include "problem.h"
+#include "problem_formatters.h"
+#include "header_builder.h"
 
 // ****************************************************************************
 // Configuration details
@@ -22,17 +25,23 @@ std::string TITLE = "Final Exam";
 std::string FORM = "A";
 
 // Source file for problem bank
-std::string BANK = "arithmetic_problems.tex";
+std::string BANK = "math_problems.tex";
 
 // Filename for the created test
 std::string FILENAME = "fancy_test.tex";
 
 // Constraints on the problem choice.
-int NUM_PROBLEMS = 20; // The test must have 20 problems.
-int MIN_TOPIC = 3; // Each topic must be covered 
-int MAX_TOPIC = 7; // by 3-7 problems.
-int MIN_DIFFICULTY = 65; // Total difficulty (using the difficulty defined 
-int MAX_DIFFICULTY = 75; // in the problem bank) must be 65-75.
+int NUM_PROBLEMS = 10; // The test must have 20 problems.
+int MIN_LONG_PROBLEMS = 3;
+int MAX_LONG_PROBLEMS = 4;
+int MIN_PROBLEMS_BY_AUTHOR = 1;
+int MAX_PROBLEMS_BY_AUTHOR = 2;
+int MIN_PROBLEMS_BY_TOPIC = 1;
+int MAX_PROBLEMS_BY_TOPIC = 2;
+// int MIN_TOPIC = 3; // Each topic must be covered 
+// int MAX_TOPIC = 7; // by 3-7 problems.
+// int MIN_DIFFICULTY = 65; // Total difficulty (using the difficulty defined 
+// int MAX_DIFFICULTY = 75; // in the problem bank) must be 65-75.
 
 // tex files to include in the test file
 std::string TEX_HEADER = "fancy_tex_header.tex";
@@ -40,62 +49,115 @@ std::string CONTENT_HEADER = "fancy_content_header.tex";
 
 // ****************************************************************************
 
-// Check whether a proposed test is valid according to the above constraints.
-bool valid(std::vector<Problem> test, std::set<std::string> topics) {
-    // Initialize metrics
-    int difficulty = 0;
-    std::map<std::string, int> topicCounts;
-    for (std::string topic : topics) {
-        topicCounts[topic] = 0;
-    }
-
-    // Calculate the metrics
-    for (Problem p : test) {
-        difficulty += p.getDifficulty();
-        topicCounts[p.getTopic()] += 1;
-    }
-
-    // Check the metrics
-    if (difficulty < MIN_DIFFICULTY || difficulty > MAX_DIFFICULTY) {
-        return false;
-    }
-    for (std::string topic : topics) {
-        int count = topicCounts[topic];
-        if (count < MIN_TOPIC || count > MAX_TOPIC) {
-            return false;
-        }
-    }
-    return true;
-}
+ bool valid(std::vector<TopicAuthorLengthProblem> potentialList, std::map<std::string, int> topics, std::map<std::string, int> authors){
+                int problem_count = 0;
+                int long_problems = 0;
+                for (auto&topic : topics){
+                    if (topic.second > MAX_PROBLEMS_BY_TOPIC || topic.second < MIN_PROBLEMS_BY_TOPIC){
+                        return false;
+                    }
+                }
+                for (auto&author : authors){
+                    if(author.second > MAX_PROBLEMS_BY_AUTHOR || author.second < MIN_PROBLEMS_BY_AUTHOR){
+                        return false;
+                    }
+                
+                }
+                for (TopicAuthorLengthProblem problem : potentialList){
+                    problem_count += 1;
+                    if (problem.getIsLong()){
+                        long_problems += 1;
+                    }
+                }
+                if (problem_count != NUM_PROBLEMS){
+                    return false;
+                }
+                if (long_problems > MAX_LONG_PROBLEMS || long_problems < MIN_LONG_PROBLEMS){
+                    return false;
+                }
+                return true;
+            }
 
 //Randomize Strategy Interface
 class RandomizeStrategy {
     public:
-        virtual std::vector<Problem> randomizeTestProblems(std::vector<Problem> bank) = 0;
+        virtual std::vector<TopicAuthorLengthProblem> randomizeTestProblems(std::vector<TopicAuthorLengthProblem> bank) = 0;
 };
 
 //Concrete Randomizing Strategy
-class SillyRandomizer : public RandomizeStrategy {
+class BetterRandomizer : public RandomizeStrategy {
     public:
-        std::vector<Problem> randomizeTestProblems(std::vector<Problem> bank) override{
+        // Given a bank of possible test problems, return randomly-chosen 
+        // problems that form a valid test, according to the contraints above.
+    std::vector<TopicAuthorLengthProblem> randomizeTestProblems(std::vector<TopicAuthorLengthProblem> bank) override{
+
+        while (true){
             // Determine the topics covered on the test
-            std::set<std::string> topics;
-            for (Problem p : bank) {
-                topics.insert(p.getTopic());
+            std::map<std::string, int> topics;
+            std::map<std::string, int> authors;
+            for (TopicAuthorLengthProblem p : bank) {
+                if (topics.find(p.getTopic()) == topics.end()) {
+                    topics.insert({p.getTopic(), 0});
+                }
+                if (authors.find(p.getAuthor()) == authors.end()) {
+                    authors.insert({p.getAuthor(), 0});
+                }
             }
+
+           
 
             // Used for random generation
             std::random_device rd;
             std::mt19937 gen(rd());
+            std::shuffle(bank.begin(), bank.end(), gen);
+            std::vector<TopicAuthorLengthProblem> testProblems;
+            int num_used_problems = 0;
+            size_t current_problem_idx = 0;
+            int long_problems = 0;
+            int short_problems = 0;
 
-            while (true) {
-                std::shuffle(bank.begin(), bank.end(), gen);
-                std::vector<Problem> testProblems(bank.begin(), bank.begin() + NUM_PROBLEMS);
-                if (valid(testProblems, topics)) {
-                    return testProblems;
+            while (num_used_problems < NUM_PROBLEMS && current_problem_idx < bank.size()){
+                TopicAuthorLengthProblem  current_problem = bank[current_problem_idx];
+
+                if (topics[current_problem.getTopic()] >= MAX_PROBLEMS_BY_TOPIC){
+                    current_problem_idx += 1;
+                    continue;
                 }
+                if (authors[current_problem.getAuthor()] >= MAX_PROBLEMS_BY_AUTHOR){
+                    current_problem_idx += 1;
+                    continue;
+                }
+                if (current_problem.getIsLong() && long_problems >= MAX_LONG_PROBLEMS){
+                    current_problem_idx += 1;
+                    continue;
+                }
+                if (!current_problem.getIsLong() && short_problems >= (NUM_PROBLEMS - MIN_LONG_PROBLEMS) ){
+                    current_problem_idx += 1;
+                    continue;
+                }
+
+                testProblems.push_back(current_problem);
+                num_used_problems += 1;
+                topics[current_problem.getTopic()] += 1;
+                authors[current_problem.getAuthor()] += 1;
+                if (current_problem.getIsLong()){
+                    long_problems += 1;
+                } else {
+                    short_problems += 1;
+                }
+                current_problem_idx+=1;
+               
             }
+
+            if(valid(testProblems, topics, authors)){
+                std::sort(testProblems.begin(), testProblems.end(), [](TopicAuthorLengthProblem& a, TopicAuthorLengthProblem& b){
+                    return a.getIsLong() < b.getIsLong();
+                });
+                return testProblems;
+            }
+            
         }
+    }
 };
 
 //Implements concrete strategy patterns (can add functionality for switching strategies)
@@ -106,38 +168,14 @@ class Context{
     public:
         Context(std::unique_ptr<RandomizeStrategy> &&strategy = {}) : strategy_(std::move(strategy)) {}
 
-        std::vector<Problem> randomize(std::vector<Problem> bank){
+        std::vector<TopicAuthorLengthProblem> randomize(std::vector<TopicAuthorLengthProblem> bank){
             return strategy_->randomizeTestProblems(bank);
         }
 };
 
-
-
-// Given a bank of possible test problems, return randomly-chosen 
-// problems that form a valid test, according to the contraints above.
-// std::vector<Problem> testProblems(std::vector<Problem> bank) {
-//     // Determine the topics covered on the test
-//     std::set<std::string> topics;
-//     for (Problem p : bank) {
-//         topics.insert(p.getTopic());
-//     }
-
-//     // Used for random generation
-//     std::random_device rd;
-//     std::mt19937 gen(rd());
-
-//     while (true) {
-//         std::shuffle(bank.begin(), bank.end(), gen);
-//         std::vector<Problem> testProblems(bank.begin(), bank.begin() + NUM_PROBLEMS);
-//         if (valid(testProblems, topics)) {
-//             return testProblems;
-//         }
-//     }
-// }
-
 int main() {
     // Read in problem list and convert to Problem objects
-    std::vector<Problem> bank = Problem::problemList(BANK);
+    std::vector<TopicAuthorLengthProblem> bank = TopicAuthorLengthProblem::problemList(BANK);
 
     // Open the file to write the test to
     std::ofstream outputFile(FILENAME); 
@@ -146,39 +184,37 @@ int main() {
         return 1;
     }
 
-    Context context(std::make_unique<SillyRandomizer>());
-    std::vector<Problem> test = context.randomize(bank);
 
     // Generate the test problems
-    // std::vector<Problem> test = testProblems(bank);
+    Context context(std::make_unique<BetterRandomizer>());
+    std::vector<TopicAuthorLengthProblem> test = context.randomize(bank);
+
+
+    // Generate the header
+    HeaderBuilder builder(TEX_HEADER, CONTENT_HEADER);
+    builder.addHeaderElement("class", CLASS);
+    builder.addHeaderElement("term", TERM);
+    builder.addHeaderElement("examno", EXAM);
+    builder.addHeaderElement("dayeve", TIME);
+    builder.addHeaderElement("formletter", FORM);
+    builder.addHeaderElement("numproblems", NUM_PROBLEMS);
+    builder.addHeaderElement("testtitle", TITLE);
+
+    std::string header = builder.build();
 
     // Write the tex header to the file
-    outputFile << "\\input{" << TEX_HEADER << "}\n";
-
-    // Include the manually-entered information
-    outputFile << "\\newcommand{\\class}{" << CLASS << "}\n";
-    outputFile << "\\newcommand{\\term}{" << TERM << "}\n";
-    outputFile << "\\newcommand{\\examno}{" << EXAM << "}\n";
-    outputFile << "\\newcommand{\\dayeve}{" << TIME << "}\n";
-    outputFile << "\\newcommand{\\formletter}{" << FORM << "}\n";
-    outputFile << "\\newcommand{\\numproblems}{" << NUM_PROBLEMS << " }\n";
-    outputFile << "\\newcommand{\\testtitle}{" << TITLE << "}\n";
-
-    // Write the content header to the file
-    outputFile << "\\input{" << CONTENT_HEADER << "}\n";
+    outputFile << header;
 
     // Write the problems to the file
-    int problem_number = 1;
-    for (Problem problem : test) {
-        if (problem_number % 2 == 1) {       // Start a new page before 
-            outputFile << "\\pagebreak\n\n"; // each odd-numbered problem
-        } else {                                 // Insert blank space before
-            outputFile << "\\vspace{350pt}\n\n"; // each even-numbered problem
+    FancyProblemFormatter formatter;
+
+    for (TopicAuthorLengthProblem problem : test) {
+        if (problem.getIsLong()){
+            outputFile << formatter.formatLongProblem(problem);
+        } else {
+            outputFile << formatter.formatProblem(problem);
         }
-        outputFile << "\\item\\begin{tabular}[t]{p{5in} p{.3in} p{.8in}}\n";
-        outputFile << problem.getQuestion();
-        outputFile << "& & \\arabic{enumi}.\\hrulefill\n\\end{tabular}\n";
-        problem_number += 1;
+        
     }
 
     // End the file

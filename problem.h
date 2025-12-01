@@ -3,13 +3,12 @@
 
 #include <string>
 #include <vector>
-#include <optional>
 
-class Problem{
+class Problem
+{
 public:
     std::string getQuestion();
     std::string getAnswer();
-
     Problem(std::string rawProblem);
     static std::vector<Problem> problemList(std::string filename);
 
@@ -18,16 +17,32 @@ private:
     std::string answer;
 };
 
-class DetailedProblem : public Problem{
+class TopicDifficultyProblem : public Problem
+{
 public:
     std::string getTopic();
     int getDifficulty();
-
-    DetailedProblem(std::string rawProblem) : Problem(rawProblem){}
+    TopicDifficultyProblem(std::string rawProblem);
+    static std::vector<TopicDifficultyProblem> problemList(std::string filename);
 
 private:
     std::string topic;
     int difficulty;
+};
+
+class TopicAuthorLengthProblem : public Problem
+{
+public:
+    std::string getTopic();
+    std::string getAuthor();
+    bool getIsLong();
+    TopicAuthorLengthProblem(std::string rawProblem);
+    static std::vector<TopicAuthorLengthProblem> problemList(std::string filename);
+
+private:
+    std::string topic;
+    std::string author;
+    bool isLong;
 };
 
 #endif

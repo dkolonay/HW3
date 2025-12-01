@@ -6,6 +6,9 @@
 #include <map>
 #include <set>
 #include "problem.h"
+#include "problem_formatters.h"
+#include "header_builder.h"
+
 
 // ****************************************************************************
 // Configuration details
@@ -27,13 +30,15 @@ int MIN_DIFFICULTY = 65; // Total difficulty (using the difficulty defined
 int MAX_DIFFICULTY = 75; // in the problem bank) must be 65-75.
 
 // tex files to include in the test file
-std::string TEX_HEADER = "simple_tex_header.tex";
+// std::string TEX_HEADER = "simple_tex_header.tex";
+std::string TEX_HEADER = "answers_tex_header.tex";
+// std::string TEX_HEADER = "questions_tex_header.tex";
 std::string CONTENT_HEADER = "simple_content_header.tex";
 
 // ****************************************************************************
 
 // Check whether a proposed test is valid according to the above constraints.
-bool valid(std::vector<Problem> test, std::set<std::string> topics) {
+bool valid(std::vector<TopicDifficultyProblem> test, std::set<std::string> topics) {
     // Initialize metrics
     int difficulty = 0;
     std::map<std::string, int> topicCounts;
@@ -42,7 +47,7 @@ bool valid(std::vector<Problem> test, std::set<std::string> topics) {
     }
 
     // Calculate the metrics
-    for (Problem p : test) {
+    for (TopicDifficultyProblem p : test) {
         difficulty += p.getDifficulty();
         topicCounts[p.getTopic()] += 1;
     }
@@ -62,10 +67,10 @@ bool valid(std::vector<Problem> test, std::set<std::string> topics) {
 
 // Given a bank of possible test problems, return randomly-chosen 
 // problems that form a valid test, according to the contraints above.
-std::vector<Problem> testProblems(std::vector<Problem> bank) {
+std::vector<TopicDifficultyProblem> testProblems(std::vector<TopicDifficultyProblem> bank) {
     // Determine the topics covered on the test
     std::set<std::string> topics;
-    for (Problem p : bank) {
+    for (TopicDifficultyProblem p : bank) {
         topics.insert(p.getTopic());
     }
 
@@ -75,7 +80,7 @@ std::vector<Problem> testProblems(std::vector<Problem> bank) {
 
     while (true) {
         std::shuffle(bank.begin(), bank.end(), gen);
-        std::vector<Problem> testProblems(bank.begin(), bank.begin() + NUM_PROBLEMS);
+        std::vector<TopicDifficultyProblem> testProblems(bank.begin(), bank.begin() + NUM_PROBLEMS);
         if (valid(testProblems, topics)) {
             return testProblems;
         }
@@ -84,10 +89,10 @@ std::vector<Problem> testProblems(std::vector<Problem> bank) {
 
 int main() {
     // Read in problem list and convert to Problem objects
-    std::vector<Problem> bank = Problem::problemList(BANK);
+    std::vector<TopicDifficultyProblem> bank = TopicDifficultyProblem::problemList(BANK);
 
     // Generate the test problems
-    std::vector<Problem> test = testProblems(bank);
+    std::vector<TopicDifficultyProblem> test = testProblems(bank);
 
     // Open the file to write the test to
     std::ofstream outputFile(FILENAME); 
@@ -97,13 +102,17 @@ int main() {
     }
 
     // Write the header to the file
-    outputFile << "\\input{" << TEX_HEADER << "}\n";
-    outputFile << "\\newcommand{\\testtitle}{" << TITLE << "}\n";
-    outputFile << "\\input{" << CONTENT_HEADER << "}\n";
+
+    HeaderBuilder builder(TEX_HEADER, CONTENT_HEADER);
+    builder.addHeaderElement("testtitle", TITLE);
+    std::string header = builder.build();
+    outputFile << header;
+
+    SimpleProblemFormatter formatter;
 
     // Write the problems to the file
     for (Problem problem : test) {
-        outputFile << "\\item " << problem.getQuestion() << "\n";
+        outputFile << formatter.formatProblem(problem);
     }
 
     // End the file
